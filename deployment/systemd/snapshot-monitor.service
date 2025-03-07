@@ -1,0 +1,13 @@
+[Unit]
+Description=Solana Snapshot Monitor
+After=network.target
+
+[Service]
+ExecStart=/usr/local/bin/snapshot-monitor
+WorkingDirectory=/var/lib/snapshot-monitor
+Restart=always
+User=snapshot
+EnvironmentFile=/etc/snapshot-monitor.env
+
+[Install]
+WantedBy=multi-user.target 

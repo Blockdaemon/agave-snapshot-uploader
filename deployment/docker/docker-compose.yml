@@ -1,0 +1,17 @@
+version: '3'
+services:
+  snapshot-monitor:
+    image: ghcr.io/maestroi/anza-snapshot-uploader:latest
+    restart: always
+    environment:
+      WATCH_DIR: "/snapshots"
+      S3_ENDPOINT: "https://s3.example.com"
+      S3_BUCKET: "solana-snapshots"
+      S3_ACCESS_KEY: "your-access-key"
+      S3_SECRET_KEY: "your-secret-key"
+      SOLANA_VERSION: "1.18.5"
+      FULL_SNAPSHOT_GAP: "25000"
+      INCREMENTAL_GAP: "500"
+      LOG_LEVEL: "info"
+    volumes:
+      - /data/snapshots:/snapshots 

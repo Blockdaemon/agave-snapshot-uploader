@@ -1,0 +1,89 @@
+name: Build and Release
+
+on:
+  release:
+    types: [created]
+
+jobs:
+  build-binary:
+    name: Build Binary
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.22'
+          check-latest: true
+
+      - name: Build binary
+        run: |
+          go build -v -o snapshot-monitor-linux-amd64 ./cmd/snapshot-monitor
+          chmod +x snapshot-monitor-linux-amd64
+
+      - name: Create deployment package
+        run: |
+          mkdir -p release/deployment
+          cp -r deployment/* release/deployment/
+          cp snapshot-monitor-linux-amd64 release/
+          cp README.md LICENSE release/
+          cd release && tar -czvf ../snapshot-monitor-${{ github.event.release.tag_name }}.tar.gz .
+
+      - name: Upload binary to release
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ github.event.release.upload_url }}
+          asset_path: ./snapshot-monitor-linux-amd64
+          asset_name: snapshot-monitor-linux-amd64
+          asset_content_type: application/octet-stream
+
+      - name: Upload deployment package to release
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ github.event.release.upload_url }}
+          asset_path: ./snapshot-monitor-${{ github.event.release.tag_name }}.tar.gz
+          asset_name: snapshot-monitor-${{ github.event.release.tag_name }}.tar.gz
+          asset_content_type: application/gzip
+
+  build-docker:
+    name: Build and Push Docker Image
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.repository_owner }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract metadata for Docker
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ghcr.io/${{ github.repository }}
+          tags: |
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            latest
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max 
