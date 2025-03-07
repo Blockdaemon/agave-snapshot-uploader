@@ -20,7 +20,7 @@ A Golang application that monitors a directory for Solana snapshot files, proces
 
 ### Prerequisites
 
-- Go 1.18 or higher
+- Go 1.23 or higher
 - Access to an S3-compatible storage
 
 ### Building from Source
