@@ -23,7 +23,8 @@ A Golang application that monitors a directory for Solana snapshot files, proces
   - Progress reporting during uploads with file size and percentage complete
   - Status tracking to prevent duplicate uploads across multiple instances
   - Automatic exclusion of temporary files and files in the remote directory
-  - Resumable uploads in case of interruptions
+  - Robust multipart upload system with automatic resumption of failed uploads
+  - Cleanup of abandoned multipart uploads to prevent storage waste
 
 ## Installation
 
@@ -256,6 +257,17 @@ The application can automatically delete old snapshots from the S3 bucket based 
 - Cleanup runs on startup and then every 6 hours
 
 This helps manage storage costs and prevents the S3 bucket from growing indefinitely.
+
+### Resumable Uploads
+
+The application includes a robust multipart upload system that can automatically resume failed uploads:
+
+- Large files (>5MB) are automatically uploaded using multipart uploads
+- Upload progress is tracked in a local state file
+- If an upload is interrupted, it will automatically resume from where it left off when the application restarts
+- Abandoned multipart uploads are automatically cleaned up after 24 hours to prevent storage waste
+
+This feature ensures that even in case of network issues or application restarts, snapshot uploads will complete successfully without having to start from the beginning.
 
 ## CI/CD
 

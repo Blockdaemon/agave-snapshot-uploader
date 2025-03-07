@@ -313,7 +313,8 @@ func (m *Monitor) processFile(path string) error {
 			"total", totalSize)
 	}
 
-	if err := m.s3Client.UploadFile(path, snap.Filename, progressFunc); err != nil {
+	// Use multipart upload for snapshot files to handle potential failures
+	if err := m.s3Client.UploadFileMultipart(path, snap.Filename, progressFunc); err != nil {
 		return fmt.Errorf("failed to upload snapshot: %w", err)
 	}
 
@@ -531,25 +532,53 @@ func containsFullSlot(keys []string, fullSlot int64) bool {
 	return false
 }
 
-// runPeriodicCleanup runs the cleanup routine periodically
+// runPeriodicCleanup runs the cleanup process periodically
 func (m *Monitor) runPeriodicCleanup(ctx context.Context) {
 	// Run cleanup immediately on startup
-	if err := m.CleanupOldSnapshots(); err != nil {
-		m.logger.Error("Failed to clean up old snapshots", "error", err)
+	if m.cfg.EnableRetention {
+		if err := m.CleanupOldSnapshots(); err != nil {
+			m.logger.Error("Failed to clean up old snapshots", "error", err)
+		}
 	}
 
-	// Run cleanup every 6 hours
+	// Clean up abandoned multipart uploads
+	if err := m.CleanupAbandonedUploads(); err != nil {
+		m.logger.Error("Failed to clean up abandoned multipart uploads", "error", err)
+	}
+
+	// Set up ticker for periodic cleanup
 	ticker := time.NewTicker(6 * time.Hour)
 	defer ticker.Stop()
 
 	for {
 		select {
 		case <-ticker.C:
-			if err := m.CleanupOldSnapshots(); err != nil {
-				m.logger.Error("Failed to clean up old snapshots", "error", err)
+			// Run snapshot retention cleanup if enabled
+			if m.cfg.EnableRetention {
+				if err := m.CleanupOldSnapshots(); err != nil {
+					m.logger.Error("Failed to clean up old snapshots", "error", err)
+				}
+			}
+
+			// Clean up abandoned multipart uploads
+			if err := m.CleanupAbandonedUploads(); err != nil {
+				m.logger.Error("Failed to clean up abandoned multipart uploads", "error", err)
 			}
 		case <-ctx.Done():
 			return
 		}
 	}
+}
+
+// CleanupAbandonedUploads cleans up abandoned multipart uploads
+func (m *Monitor) CleanupAbandonedUploads() error {
+	m.logger.Info("Starting cleanup of abandoned multipart uploads")
+
+	// Clean up uploads older than 24 hours
+	if err := m.s3Client.CleanupAbandonedUploads(24 * time.Hour); err != nil {
+		return fmt.Errorf("failed to clean up abandoned multipart uploads: %w", err)
+	}
+
+	m.logger.Info("Completed cleanup of abandoned multipart uploads")
+	return nil
 }
