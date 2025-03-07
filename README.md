@@ -8,13 +8,22 @@ A Golang application that monitors a directory for Solana snapshot files, proces
 - Validates snapshots based on configurable rules:
   - Full Snapshots: Only uploads if the difference between the last uploaded full snapshot's slot and the new snapshot's slot is at least 25,000 slots (configurable)
   - Incremental Snapshots: Ensures the first slot matches an existing full snapshot and the second slot is within 500 slots of the previous incremental snapshot (configurable)
+  - Option to disable incremental snapshot uploads entirely
 - Generates and uploads metadata files with:
-  - Solana client version
+  - Solana client version and feature set
   - Snapshot slot number
-  - Timestamp of when the snapshot was generated
+  - Timestamp of when the snapshot was generated (both Unix and human-readable formats)
   - SHA256 hash of the snapshot file for verification
+  - Upload status and uploader information
+- Auto-detects Solana version and feature set via RPC
+- Automatic retention management to delete old snapshots based on configurable time period
 - Supports configuration through a config file or environment variables
 - Can run as a systemd service or inside a Docker container
+- Advanced features:
+  - Progress reporting during uploads with file size and percentage complete
+  - Status tracking to prevent duplicate uploads across multiple instances
+  - Automatic exclusion of temporary files and files in the remote directory
+  - Resumable uploads in case of interruptions
 
 ## Installation
 
@@ -67,8 +76,9 @@ s3_bucket: "solana-snapshots"
 s3_access_key: "your-access-key"
 s3_secret_key: "your-secret-key"
 
-# Solana version to include in metadata (optional, auto-detected if not specified)
-solana_version: "1.18.5"
+# Solana configuration
+solana_version: "1.18.5"  # Optional, auto-detected if not specified
+solana_rpc_url: "http://localhost:8899"  # Used to auto-detect Solana version and feature set
 
 # Minimum slot gap between full snapshots
 full_snapshot_gap: 25000
@@ -76,8 +86,18 @@ full_snapshot_gap: 25000
 # Maximum slot gap for incremental snapshots
 incremental_gap: 500
 
+# Enable or disable incremental snapshot uploads (true/false)
+enable_incremental_snap: true
+
+# Retention settings
+enable_retention: true  # Enable automatic deletion of old snapshots
+retention_period_hours: 168  # Delete snapshots older than 7 days
+
 # Log level (debug, info, warn, error)
 log_level: "info"
+
+# Hostname to identify this instance (optional, auto-detected if not specified)
+hostname: "node-1"
 ```
 
 ### Environment Variables
@@ -89,10 +109,15 @@ Alternatively, you can use environment variables:
 - `S3_BUCKET`: S3 bucket name
 - `S3_ACCESS_KEY`: S3 access key
 - `S3_SECRET_KEY`: S3 secret key
-- `SOLANA_VERSION`: Solana version to include in metadata
+- `SOLANA_VERSION`: Solana version to include in metadata (optional if `SOLANA_RPC_URL` is provided)
+- `SOLANA_RPC_URL`: Solana RPC URL for auto-detecting version and feature set
 - `FULL_SNAPSHOT_GAP`: Minimum slot gap between full snapshots
 - `INCREMENTAL_GAP`: Maximum slot gap for incremental snapshots
+- `ENABLE_INCREMENTAL_SNAP`: Enable or disable incremental snapshot uploads (true/false)
+- `ENABLE_RETENTION`: Enable or disable automatic deletion of old snapshots (true/false)
+- `RETENTION_PERIOD_HOURS`: Number of hours to keep snapshots before deleting them (default: 168, which is 7 days)
 - `LOG_LEVEL`: Log level (debug, info, warn, error)
+- `HOSTNAME`: Hostname to identify this instance
 
 ## Usage
 
@@ -182,6 +207,55 @@ nano /your/preferred/location/docker-compose.yml
 cd /your/preferred/location/
 docker-compose up -d
 ```
+
+## Advanced Features
+
+### Status Tracking
+
+The application uses a status tracking system to prevent duplicate uploads across multiple instances:
+
+1. Before uploading a snapshot, it creates a metadata file with an "uploading" status
+2. After successfully uploading the snapshot, it updates the metadata file with a "completed" status
+3. When checking if a snapshot exists, it also checks its status to avoid duplicate uploads
+4. If another instance is already uploading a snapshot, it will skip it
+
+This allows multiple instances to run simultaneously without conflicts.
+
+### File Exclusion Rules
+
+The application automatically excludes the following files from processing:
+
+- Files with names containing "tmp" or "temp" (case-insensitive)
+- Files starting with a dot (hidden files)
+- Files ending with `.tmp`
+- Files in the `watchdir/remote` directory
+
+### Progress Reporting
+
+The application provides detailed progress reporting during uploads:
+
+- Shows the file size in a human-readable format (e.g., 1.2 GiB)
+- Displays progress updates during the upload, showing:
+  - The percentage of the file uploaded
+  - The amount uploaded so far (e.g., 500 MiB)
+  - The total file size (e.g., 1.2 GiB)
+
+### Directory Structure
+
+The application creates a `remote` directory inside the watch directory. Files in this directory are never processed or uploaded, making it a safe place to store files that should not be uploaded.
+
+### Retention Management
+
+The application can automatically delete old snapshots from the S3 bucket based on a configurable retention period:
+
+- Enable retention management with the `enable_retention` configuration option
+- Set the retention period in hours with the `retention_period_hours` option (default: 168 hours, which is 7 days)
+- The application will delete snapshots older than the retention period
+- The latest full snapshot is always preserved, regardless of age
+- When a full snapshot is deleted, all its incremental snapshots are also deleted
+- Cleanup runs on startup and then every 6 hours
+
+This helps manage storage costs and prevents the S3 bucket from growing indefinitely.
 
 ## CI/CD
 

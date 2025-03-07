@@ -33,3 +33,4 @@ go.work.sum
 /snapshot-monitor.env
 /docker-compose.yml
 /config.yaml
+/run.sh

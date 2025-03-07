@@ -10,24 +10,39 @@ import (
 
 // Config holds the application configuration
 type Config struct {
-	WatchDir        string `yaml:"watch_dir" json:"watch_dir"`
-	S3Endpoint      string `yaml:"s3_endpoint" json:"s3_endpoint"`
-	S3Bucket        string `yaml:"s3_bucket" json:"s3_bucket"`
-	S3AccessKey     string `yaml:"s3_access_key" json:"s3_access_key"`
-	S3SecretKey     string `yaml:"s3_secret_key" json:"s3_secret_key"`
-	SolanaVersion   string `yaml:"solana_version" json:"solana_version"`
-	FullSnapshotGap int    `yaml:"full_snapshot_gap" json:"full_snapshot_gap"`
-	IncrementalGap  int    `yaml:"incremental_gap" json:"incremental_gap"`
-	LogLevel        string `yaml:"log_level" json:"log_level"`
+	WatchDir              string `yaml:"watch_dir" json:"watch_dir"`
+	S3Endpoint            string `yaml:"s3_endpoint" json:"s3_endpoint"`
+	S3Bucket              string `yaml:"s3_bucket" json:"s3_bucket"`
+	S3AccessKey           string `yaml:"s3_access_key" json:"s3_access_key"`
+	S3SecretKey           string `yaml:"s3_secret_key" json:"s3_secret_key"`
+	SolanaVersion         string `yaml:"solana_version" json:"solana_version"`
+	SolanaRpcUrl          string `yaml:"solana_rpc_url" json:"solana_rpc_url"`
+	FullSnapshotGap       int    `yaml:"full_snapshot_gap" json:"full_snapshot_gap"`
+	IncrementalGap        int    `yaml:"incremental_gap" json:"incremental_gap"`
+	EnableIncrementalSnap bool   `yaml:"enable_incremental_snap" json:"enable_incremental_snap"`
+	EnableRetention       bool   `yaml:"enable_retention" json:"enable_retention"`
+	RetentionPeriodHours  int    `yaml:"retention_period_hours" json:"retention_period_hours"`
+	LogLevel              string `yaml:"log_level" json:"log_level"`
+	Hostname              string `yaml:"hostname" json:"hostname"`
 }
 
 // DefaultConfig returns a configuration with default values
 func DefaultConfig() *Config {
+	hostname, err := os.Hostname()
+	if err != nil {
+		hostname = "unknown"
+	}
+
 	return &Config{
-		WatchDir:        "/snapshots",
-		FullSnapshotGap: 25000,
-		IncrementalGap:  500,
-		LogLevel:        "info",
+		WatchDir:              "/snapshots",
+		SolanaRpcUrl:          "http://localhost:8899",
+		FullSnapshotGap:       25000,
+		IncrementalGap:        500,
+		EnableIncrementalSnap: true,
+		EnableRetention:       false,
+		RetentionPeriodHours:  168, // 7 days by default
+		LogLevel:              "info",
+		Hostname:              hostname,
 	}
 }
 
@@ -69,6 +84,9 @@ func LoadFromEnv() *Config {
 	if val := os.Getenv("SOLANA_VERSION"); val != "" {
 		cfg.SolanaVersion = val
 	}
+	if val := os.Getenv("SOLANA_RPC_URL"); val != "" {
+		cfg.SolanaRpcUrl = val
+	}
 	if val := os.Getenv("FULL_SNAPSHOT_GAP"); val != "" {
 		if intVal, err := strconv.Atoi(val); err == nil {
 			cfg.FullSnapshotGap = intVal
@@ -79,8 +97,22 @@ func LoadFromEnv() *Config {
 			cfg.IncrementalGap = intVal
 		}
 	}
+	if val := os.Getenv("ENABLE_INCREMENTAL_SNAP"); val != "" {
+		cfg.EnableIncrementalSnap = val == "true" || val == "1" || val == "yes"
+	}
+	if val := os.Getenv("ENABLE_RETENTION"); val != "" {
+		cfg.EnableRetention = val == "true" || val == "1" || val == "yes"
+	}
+	if val := os.Getenv("RETENTION_PERIOD_HOURS"); val != "" {
+		if intVal, err := strconv.Atoi(val); err == nil {
+			cfg.RetentionPeriodHours = intVal
+		}
+	}
 	if val := os.Getenv("LOG_LEVEL"); val != "" {
 		cfg.LogLevel = val
+	}
+	if val := os.Getenv("HOSTNAME"); val != "" {
+		cfg.Hostname = val
 	}
 
 	return cfg

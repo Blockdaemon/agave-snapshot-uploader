@@ -28,4 +28,4 @@ COPY --from=builder /snapshot-monitor /app/
 RUN mkdir -p /snapshots
 
 # Set the entrypoint
-ENTRYPOINT ["/app/snapshot-monitor"] 
+ENTRYPOINT ["/app/snapshot-monitor"] cngoh0sfd7unq8o7np40	

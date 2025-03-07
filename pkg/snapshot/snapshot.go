@@ -24,15 +24,16 @@ const (
 
 // Snapshot represents a Solana snapshot file
 type Snapshot struct {
-	Path          string       `json:"path"`
-	Filename      string       `json:"filename"`
-	Type          SnapshotType `json:"type"`
-	Slot          int64        `json:"slot"`
-	FullSlot      int64        `json:"full_slot,omitempty"` // Only for incremental snapshots
-	ValidatorID   string       `json:"validator_id"`
-	Hash          string       `json:"hash,omitempty"`
-	SolanaVersion string       `json:"solana_version,omitempty"`
-	Timestamp     int64        `json:"timestamp,omitempty"`
+	Path             string       `json:"path"`
+	Filename         string       `json:"filename"`
+	Type             SnapshotType `json:"type"`
+	Slot             int64        `json:"slot"`
+	FullSlot         int64        `json:"full_slot,omitempty"` // Only for incremental snapshots
+	ValidatorID      string       `json:"validator_id"`
+	Hash             string       `json:"hash,omitempty"`
+	SolanaVersion    string       `json:"solana_version,omitempty"`
+	SolanaFeatureSet int64        `json:"solana_feature_set,omitempty"`
+	Timestamp        int64        `json:"timestamp,omitempty"`
 }
 
 var (

@@ -11,6 +11,7 @@ import (
 	"github.com/maestroi/anza-snapshot-uploader/pkg/config"
 	"github.com/maestroi/anza-snapshot-uploader/pkg/monitor"
 	"github.com/maestroi/anza-snapshot-uploader/pkg/s3"
+	"github.com/maestroi/anza-snapshot-uploader/pkg/solana"
 )
 
 func main() {
@@ -63,6 +64,21 @@ func main() {
 	logger = slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{
 		Level: level,
 	}))
+
+	// Fetch Solana version if RPC URL is provided and no version is specified
+	if cfg.SolanaRpcUrl != "" && cfg.SolanaVersion == "" {
+		logger.Info("Fetching Solana version from RPC", "url", cfg.SolanaRpcUrl)
+		version, err := solana.GetVersion(cfg.SolanaRpcUrl)
+		if err != nil {
+			logger.Warn("Failed to fetch Solana version", "error", err)
+		} else {
+			cfg.SolanaVersion = version.SolanaCore
+			logger.Info("Fetched Solana version",
+				"version", version.SolanaCore,
+				"feature_set", version.FeatureSet,
+				"fetched_at", version.FetchedAt)
+		}
+	}
 
 	// Create S3 client
 	s3Client, err := s3.NewClient(cfg.S3Endpoint, cfg.S3Bucket, cfg.S3AccessKey, cfg.S3SecretKey)

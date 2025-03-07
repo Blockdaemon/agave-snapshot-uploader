@@ -9,8 +9,9 @@ s3_bucket: "solana-snapshots"
 s3_access_key: "your-access-key"
 s3_secret_key: "your-secret-key"
 
-# Solana version to include in metadata (optional, auto-detected if not specified)
-solana_version: "1.18.5"
+# Solana configuration
+# solana_version: "1.18.5"  # Optional, auto-detected if not specified
+solana_rpc_url: "http://localhost:8899"  # Used to auto-detect Solana version and feature set
 
 # Minimum slot gap between full snapshots
 full_snapshot_gap: 25000
@@ -18,5 +19,15 @@ full_snapshot_gap: 25000
 # Maximum slot gap for incremental snapshots
 incremental_gap: 500
 
+# Enable or disable incremental snapshot uploads (true/false)
+enable_incremental_snap: true
+
+# Retention settings
+enable_retention: true  # Enable automatic deletion of old snapshots
+retention_period_hours: 168  # Delete snapshots older than 7 days
+
 # Log level (debug, info, warn, error)
-log_level: "info" 
+log_level: "info"
+
+# Hostname to identify this instance (optional, auto-detected if not specified)
+hostname: "node-1" 
