@@ -20,14 +20,16 @@ import (
 
 // Monitor watches a directory for new snapshot files
 type Monitor struct {
-	cfg              *config.Config
-	s3Client         *s3.Client
-	watcher          *fsnotify.Watcher
-	lastFullSnapshot *snapshot.Snapshot
-	lastIncSnapshot  *snapshot.Snapshot
-	mu               sync.Mutex
-	logger           *slog.Logger
-	solanaFeatureSet int64
+	cfg                 *config.Config
+	s3Client            *s3.Client
+	watcher             *fsnotify.Watcher
+	lastFullSnapshot    *snapshot.Snapshot
+	lastIncSnapshot     *snapshot.Snapshot
+	mu                  sync.Mutex
+	logger              *slog.Logger
+	solanaFeatureSet    int64
+	uploadStartTime     time.Time
+	metaUploadStartTime time.Time
 }
 
 // New creates a new monitor
@@ -286,13 +288,54 @@ func (m *Monitor) processFile(path string) error {
 			percentage := float64(uploaded) / float64(total) * 100
 			uploadedSize := formatFileSize(uploaded)
 			totalSize := formatFileSize(total)
-			m.logger.Info("Upload progress",
-				"file", metaFilename,
-				"progress", fmt.Sprintf("%.1f%%", percentage),
-				"uploaded", uploadedSize,
-				"total", totalSize)
+
+			// Calculate speed and ETA
+			now := time.Now()
+			elapsedTime := now.Sub(m.metaUploadStartTime).Seconds()
+
+			// Only calculate speed if we have some elapsed time
+			if elapsedTime > 0 {
+				// Calculate speed in bytes per second
+				speed := float64(uploaded) / elapsedTime
+				speedStr := formatFileSize(int64(speed)) + "/s"
+
+				// Calculate ETA
+				var etaStr string
+				if speed > 0 {
+					remainingBytes := total - uploaded
+					etaSeconds := float64(remainingBytes) / speed
+
+					// Format ETA
+					if etaSeconds < 60 {
+						etaStr = fmt.Sprintf("%.0f sec", etaSeconds)
+					} else if etaSeconds < 3600 {
+						etaStr = fmt.Sprintf("%.1f min", etaSeconds/60)
+					} else {
+						etaStr = fmt.Sprintf("%.1f hours", etaSeconds/3600)
+					}
+				} else {
+					etaStr = "calculating..."
+				}
+
+				m.logger.Info("Upload progress",
+					"file", metaFilename,
+					"progress", fmt.Sprintf("%.1f%%", percentage),
+					"uploaded", uploadedSize,
+					"total", totalSize,
+					"speed", speedStr,
+					"eta", etaStr)
+			} else {
+				m.logger.Info("Upload progress",
+					"file", metaFilename,
+					"progress", fmt.Sprintf("%.1f%%", percentage),
+					"uploaded", uploadedSize,
+					"total", totalSize)
+			}
 		}
 	}
+
+	// Record the start time of the metadata upload
+	m.metaUploadStartTime = time.Now()
 
 	if err := m.s3Client.UploadFile(metaPath, metaFilename, metaProgressFunc); err != nil {
 		return fmt.Errorf("failed to upload metadata: %w", err)
@@ -306,12 +349,53 @@ func (m *Monitor) processFile(path string) error {
 		percentage := float64(uploaded) / float64(total) * 100
 		uploadedSize := formatFileSize(uploaded)
 		totalSize := formatFileSize(total)
-		m.logger.Info("Upload progress",
-			"file", filepath.Base(path),
-			"progress", fmt.Sprintf("%.1f%%", percentage),
-			"uploaded", uploadedSize,
-			"total", totalSize)
+
+		// Calculate speed and ETA
+		now := time.Now()
+		elapsedTime := now.Sub(m.uploadStartTime).Seconds()
+
+		// Only calculate speed if we have some elapsed time
+		if elapsedTime > 0 {
+			// Calculate speed in bytes per second
+			speed := float64(uploaded) / elapsedTime
+			speedStr := formatFileSize(int64(speed)) + "/s"
+
+			// Calculate ETA
+			var etaStr string
+			if speed > 0 {
+				remainingBytes := total - uploaded
+				etaSeconds := float64(remainingBytes) / speed
+
+				// Format ETA
+				if etaSeconds < 60 {
+					etaStr = fmt.Sprintf("%.0f sec", etaSeconds)
+				} else if etaSeconds < 3600 {
+					etaStr = fmt.Sprintf("%.1f min", etaSeconds/60)
+				} else {
+					etaStr = fmt.Sprintf("%.1f hours", etaSeconds/3600)
+				}
+			} else {
+				etaStr = "calculating..."
+			}
+
+			m.logger.Info("Upload progress",
+				"file", filepath.Base(path),
+				"progress", fmt.Sprintf("%.1f%%", percentage),
+				"uploaded", uploadedSize,
+				"total", totalSize,
+				"speed", speedStr,
+				"eta", etaStr)
+		} else {
+			m.logger.Info("Upload progress",
+				"file", filepath.Base(path),
+				"progress", fmt.Sprintf("%.1f%%", percentage),
+				"uploaded", uploadedSize,
+				"total", totalSize)
+		}
 	}
+
+	// Record the start time of the upload
+	m.uploadStartTime = time.Now()
 
 	// Use multipart upload for snapshot files to handle potential failures
 	if err := m.s3Client.UploadFileMultipart(path, snap.Filename, progressFunc); err != nil {
@@ -326,6 +410,10 @@ func (m *Monitor) processFile(path string) error {
 
 	// Upload the updated metadata file
 	m.logger.Info("Uploading metadata with 'completed' status", "path", metaPath, "size", metaSize)
+
+	// Reset the metadata upload start time for the second upload
+	m.metaUploadStartTime = time.Now()
+
 	if err := m.s3Client.UploadFile(metaPath, metaFilename, metaProgressFunc); err != nil {
 		return fmt.Errorf("failed to upload updated metadata: %w", err)
 	}

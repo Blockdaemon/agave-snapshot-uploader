@@ -25,6 +25,7 @@ A Golang application that monitors a directory for Solana snapshot files, proces
   - Automatic exclusion of temporary files and files in the remote directory
   - Robust multipart upload system with automatic resumption of failed uploads
   - Cleanup of abandoned multipart uploads to prevent storage waste
+  - Enhanced S3 compatibility with proper Content-Length headers for all uploads
 
 ## Installation
 
@@ -240,6 +241,10 @@ The application provides detailed progress reporting during uploads:
   - The percentage of the file uploaded
   - The amount uploaded so far (e.g., 500 MiB)
   - The total file size (e.g., 1.2 GiB)
+  - The current upload speed (e.g., 25 MiB/s)
+  - The estimated time remaining (e.g., 2.5 min)
+
+This real-time feedback helps users monitor the progress of large snapshot uploads and estimate completion times.
 
 ### Directory Structure
 
@@ -263,11 +268,14 @@ This helps manage storage costs and prevents the S3 bucket from growing indefini
 The application includes a robust multipart upload system that can automatically resume failed uploads:
 
 - Large files (>5MB) are automatically uploaded using multipart uploads
-- Upload progress is tracked in a local state file
+- Upload progress is tracked in a local state file stored in the system's temporary directory
 - If an upload is interrupted, it will automatically resume from where it left off when the application restarts
 - Abandoned multipart uploads are automatically cleaned up after 24 hours to prevent storage waste
+- Fallback mechanisms ensure uploads work even with limited permissions:
+  - If the application can't write to the snapshot directory, it uses the system's temporary directory
+  - If multipart uploads can't be used due to permission issues, it falls back to regular uploads
 
-This feature ensures that even in case of network issues or application restarts, snapshot uploads will complete successfully without having to start from the beginning.
+This feature ensures that even in case of network issues, application restarts, or permission constraints, snapshot uploads will complete successfully without having to start from the beginning.
 
 ## CI/CD
 
@@ -294,3 +302,17 @@ docker pull ghcr.io/maestroi/anza-snapshot-uploader:v1.0.0
 ## License
 
 This project is licensed under the Apache License 2.0 - see the LICENSE file for details.
+
+### S3 Compatibility
+
+The application is designed to work with any S3-compatible storage service, including:
+
+- Amazon S3
+- MinIO
+- Ceph Object Gateway
+- Wasabi
+- Backblaze B2 (with S3 compatibility)
+- DigitalOcean Spaces
+- Linode Object Storage
+
+The application ensures proper Content-Length headers are included in all S3 requests, which is required by many S3-compatible services. This prevents common "411 Length Required" errors that can occur with some S3 implementations.
