@@ -10,12 +10,12 @@ import (
 	"sync"
 	"time"
 
+	"github.com/Blockdaemon/anza-snapshot-uploader/pkg/config"
+	"github.com/Blockdaemon/anza-snapshot-uploader/pkg/metadata"
+	"github.com/Blockdaemon/anza-snapshot-uploader/pkg/s3"
+	"github.com/Blockdaemon/anza-snapshot-uploader/pkg/snapshot"
+	"github.com/Blockdaemon/anza-snapshot-uploader/pkg/solana"
 	"github.com/fsnotify/fsnotify"
-	"github.com/maestroi/anza-snapshot-uploader/pkg/config"
-	"github.com/maestroi/anza-snapshot-uploader/pkg/metadata"
-	"github.com/maestroi/anza-snapshot-uploader/pkg/s3"
-	"github.com/maestroi/anza-snapshot-uploader/pkg/snapshot"
-	"github.com/maestroi/anza-snapshot-uploader/pkg/solana"
 )
 
 // Monitor watches a directory for new snapshot files
