@@ -7,7 +7,7 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/Blockdaemon/anza-snapshot-uploader/pkg/snapshot"
+	"github.com/Blockdaemon/agave-snapshot-uploader/pkg/snapshot"
 )
 
 // UploadStatus represents the status of a snapshot upload

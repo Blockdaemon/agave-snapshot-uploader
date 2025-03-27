@@ -8,10 +8,10 @@ import (
 	"os/signal"
 	"syscall"
 
-	"github.com/Blockdaemon/anza-snapshot-uploader/pkg/config"
-	"github.com/Blockdaemon/anza-snapshot-uploader/pkg/monitor"
-	"github.com/Blockdaemon/anza-snapshot-uploader/pkg/s3"
-	"github.com/Blockdaemon/anza-snapshot-uploader/pkg/solana"
+	"github.com/Blockdaemon/agave-snapshot-uploader/pkg/config"
+	"github.com/Blockdaemon/agave-snapshot-uploader/pkg/monitor"
+	"github.com/Blockdaemon/agave-snapshot-uploader/pkg/s3"
+	"github.com/Blockdaemon/agave-snapshot-uploader/pkg/solana"
 )
 
 func main() {

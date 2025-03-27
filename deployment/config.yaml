@@ -30,4 +30,4 @@ retention_period_hours: 168  # Delete snapshots older than 7 days
 log_level: "info"
 
 # Hostname to identify this instance (optional, auto-detected if not specified)
-hostname: "node-1" 
+hostname: "node-1"

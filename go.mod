@@ -1,4 +1,4 @@
-module github.com/Blockdaemon/anza-snapshot-uploader
+module github.com/Blockdaemon/agave-snapshot-uploader
 
 go 1.23.4
 

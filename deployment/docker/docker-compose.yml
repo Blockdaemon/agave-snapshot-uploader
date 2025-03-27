@@ -1,7 +1,7 @@
 version: '3'
 services:
   snapshot-monitor:
-    image: ghcr.io/maestroi/anza-snapshot-uploader:latest
+    image: ghcr.io/blockdaemon/agave-snapshot-uploader:latest
     restart: always
     environment:
       WATCH_DIR: "/snapshots"
@@ -19,4 +19,4 @@ services:
       LOG_LEVEL: "info"
       HOSTNAME: "node-1"
     volumes:
-      - /data/snapshots:/snapshots 
+      - /data/snapshots:/snapshots

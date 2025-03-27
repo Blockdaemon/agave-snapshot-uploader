@@ -37,14 +37,14 @@ A Golang application that monitors a directory for Solana snapshot files, proces
 ### Building from Source
 
 ```bash
-git clone https://github.com/maestroi/anza-snapshot-uploader.git
-cd anza-snapshot-uploader
+git clone https://github.com/maestroi/agave-snapshot-uploader.git
+cd agave-snapshot-uploader
 go build -o snapshot-monitor ./cmd/snapshot-monitor
 ```
 
 ### Using Pre-built Binaries
 
-You can download pre-built binaries from the [Releases](https://github.com/maestroi/anza-snapshot-uploader/releases) page. Each release includes:
+You can download pre-built binaries from the [Releases](https://github.com/maestroi/agave-snapshot-uploader/releases) page. Each release includes:
 
 - A Linux binary (`snapshot-monitor-linux-amd64`)
 - A deployment package (`snapshot-monitor-vX.Y.Z.tar.gz`) containing:
@@ -173,7 +173,7 @@ sudo systemctl start snapshot-monitor
 1. Pull the Docker image:
 
 ```bash
-docker pull ghcr.io/maestroi/anza-snapshot-uploader:latest
+docker pull ghcr.io/maestroi/agave-snapshot-uploader:latest
 ```
 
 2. Run the container:
@@ -186,7 +186,7 @@ docker run -d \
   -e S3_BUCKET=solana-snapshots \
   -e S3_ACCESS_KEY=your-access-key \
   -e S3_SECRET_KEY=your-secret-key \
-  ghcr.io/maestroi/anza-snapshot-uploader:latest
+  ghcr.io/maestroi/agave-snapshot-uploader:latest
 ```
 
 ### Running with Docker Compose
@@ -290,13 +290,13 @@ This project uses GitHub Actions for continuous integration and deployment:
 Docker images are available from the GitHub Container Registry:
 
 ```bash
-docker pull ghcr.io/maestroi/anza-snapshot-uploader:latest
+docker pull ghcr.io/maestroi/agave-snapshot-uploader:latest
 ```
 
 You can also use a specific version:
 
 ```bash
-docker pull ghcr.io/maestroi/anza-snapshot-uploader:v1.0.0
+docker pull ghcr.io/maestroi/agave-snapshot-uploader:v1.0.0
 ```
 
 ## License
