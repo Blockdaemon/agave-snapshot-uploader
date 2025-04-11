@@ -16,7 +16,7 @@ import (
 
 func main() {
 	// Parse command line flags
-	configFile := flag.String("config", "", "Path to config file")
+	configFile := flag.String("config", "config.yaml", "Path to config file (default: config.yaml)")
 	flag.Parse()
 
 	// Setup logger
@@ -28,15 +28,11 @@ func main() {
 	var cfg *config.Config
 	var err error
 
-	if *configFile != "" {
-		// Load from config file
-		cfg, err = config.LoadFromFile(*configFile)
-		if err != nil {
-			logger.Error("Failed to load config file", "error", err)
-			os.Exit(1)
-		}
-	} else {
-		// Load from environment variables
+	// Load from config file
+	cfg, err = config.LoadFromFile(*configFile)
+	if err != nil {
+		logger.Warn("Failed to load config file", "path", *configFile, "error", err)
+		logger.Info("Falling back to environment variables")
 		cfg = config.LoadFromEnv()
 	}
 
@@ -85,6 +81,15 @@ func main() {
 	if err != nil {
 		logger.Error("Failed to create S3 client", "error", err)
 		os.Exit(1)
+	}
+
+	// Set the configured logger
+	s3Client.SetLogger(logger)
+
+	// Set default public endpoint if not specified
+	if cfg.S3PublicEndpoint == "" {
+		cfg.S3PublicEndpoint = "https://solana-snapshot.blockdaemon.com"
+		logger.Info("Using default public endpoint", "endpoint", cfg.S3PublicEndpoint)
 	}
 
 	// Create monitor

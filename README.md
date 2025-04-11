@@ -16,16 +16,26 @@ A Golang application that monitors a directory for Solana snapshot files, proces
   - SHA256 hash of the snapshot file for verification
   - Upload status and uploader information
 - Auto-detects Solana version and feature set via RPC
-- Automatic retention management to delete old snapshots based on configurable time period
+- Automatic upload of genesis.tar.bz2 file if not present in the bucket
+- Advanced retention management:
+  - Configurable count-based retention: keep N most recent full and incremental snapshots
+  - Configurable time-based retention: keep snapshots newer than X hours
+  - Independent retention policies for full and incremental snapshots
+- Organized latest.json file with optimized field ordering and no duplicate fields
 - Supports configuration through a config file or environment variables
 - Can run as a systemd service or inside a Docker container
 - Advanced features:
+  - High-performance pure Go implementation for S3 uploads with multipart support
+  - Configurable upload performance parameters (coming in a future version):
+    - Parallel uploads (currently fixed at 5)
+    - Chunk size for multipart uploads (currently fixed at 32MB)
   - Progress reporting during uploads with file size and percentage complete
   - Status tracking to prevent duplicate uploads across multiple instances
   - Automatic exclusion of temporary files and files in the remote directory
   - Robust multipart upload system with automatic resumption of failed uploads
   - Cleanup of abandoned multipart uploads to prevent storage waste
   - Enhanced S3 compatibility with proper Content-Length headers for all uploads
+  - Improved error handling and retry mechanism for reliable uploads
 
 ## Installation
 
@@ -77,6 +87,7 @@ s3_endpoint: "https://s3.example.com"
 s3_bucket: "solana-snapshots"
 s3_access_key: "your-access-key"
 s3_secret_key: "your-secret-key"
+s3_public_endpoint: "https://snapshots.example.com"  # Optional public endpoint for URLs in metadata
 
 # Solana configuration
 solana_version: "1.18.5"  # Optional, auto-detected if not specified
@@ -91,9 +102,22 @@ incremental_gap: 500
 # Enable or disable incremental snapshot uploads (true/false)
 enable_incremental_snap: true
 
+# Enable or disable metadata cleanup (true/false)
+enable_metadata_cleanup: true
+
 # Retention settings
-enable_retention: true  # Enable automatic deletion of old snapshots
+enable_retention: true  # Enable automatic deletion of old snapshots (in multi-instance setups, enable on only one instance)
+
+# Legacy retention setting - will be used if the more specific settings below are not provided
 retention_period_hours: 168  # Delete snapshots older than 7 days
+
+# Full snapshot retention (count and time-based)
+full_snapshot_retain_count: 3  # Keep at least this many recent full snapshots
+full_snapshot_retain_hours: 672  # Keep full snapshots for 28 days (4 weeks)
+
+# Incremental snapshot retention (count and time-based)
+incremental_retain_count: 5  # Keep this many recent incremental snapshots per full snapshot
+incremental_retain_hours: 168  # Keep incremental snapshots for 7 days (1 week)
 
 # Log level (debug, info, warn, error)
 log_level: "info"
@@ -108,16 +132,24 @@ Alternatively, you can use environment variables:
 
 - `WATCH_DIR`: Directory to monitor for snapshots
 - `S3_ENDPOINT`: S3-compatible storage URL
+- `S3_PUBLIC_ENDPOINT`: Public endpoint URL for snapshot access
 - `S3_BUCKET`: S3 bucket name
 - `S3_ACCESS_KEY`: S3 access key
 - `S3_SECRET_KEY`: S3 secret key
+- `S3_UPLOAD_CONCURRENCY`: Number of parallel upload operations (will be supported in a future version)
+- `S3_CHUNK_SIZE_MB`: Size of each upload chunk in MB (will be supported in a future version)
 - `SOLANA_VERSION`: Solana version to include in metadata (optional if `SOLANA_RPC_URL` is provided)
 - `SOLANA_RPC_URL`: Solana RPC URL for auto-detecting version and feature set
 - `FULL_SNAPSHOT_GAP`: Minimum slot gap between full snapshots
 - `INCREMENTAL_GAP`: Maximum slot gap for incremental snapshots
 - `ENABLE_INCREMENTAL_SNAP`: Enable or disable incremental snapshot uploads (true/false)
 - `ENABLE_RETENTION`: Enable or disable automatic deletion of old snapshots (true/false)
-- `RETENTION_PERIOD_HOURS`: Number of hours to keep snapshots before deleting them (default: 168, which is 7 days)
+- `RETENTION_PERIOD_HOURS`: Number of hours to keep snapshots before deleting them (legacy setting)
+- `FULL_SNAPSHOT_RETAIN_COUNT`: Number of recent full snapshots to keep
+- `FULL_SNAPSHOT_RETAIN_HOURS`: Number of hours to keep full snapshots
+- `INCREMENTAL_RETAIN_COUNT`: Number of recent incremental snapshots to keep per full snapshot
+- `INCREMENTAL_RETAIN_HOURS`: Number of hours to keep incremental snapshots
+- `ENABLE_METADATA_CLEANUP`: Enable or disable metadata cleanup (true/false)
 - `LOG_LEVEL`: Log level (debug, info, warn, error)
 - `HOSTNAME`: Hostname to identify this instance
 
@@ -127,6 +159,18 @@ Alternatively, you can use environment variables:
 
 ```bash
 ./snapshot-monitor -config config.yaml
+```
+
+The `-config` flag defaults to `config.yaml` in the current directory, so you can also run:
+
+```bash
+./snapshot-monitor
+```
+
+Or with a custom config file:
+
+```bash
+./snapshot-monitor -config /path/to/custom-config.yaml
 ```
 
 Or with environment variables:
@@ -212,6 +256,15 @@ docker-compose up -d
 
 ## Advanced Features
 
+### Genesis File Auto-Upload
+
+The application automatically checks for and uploads the genesis.tar.bz2 file if it doesn't exist in the S3 bucket:
+
+- On startup, it checks if genesis.tar.bz2 exists in the S3 bucket
+- If not, it looks for the file in the watch directory and its parent directory
+- If found, it uploads the file to the S3 bucket
+- This ensures that validators can access both snapshots and the genesis file from the same bucket
+
 ### Status Tracking
 
 The application uses a status tracking system to prevent duplicate uploads across multiple instances:
@@ -250,18 +303,71 @@ This real-time feedback helps users monitor the progress of large snapshot uploa
 
 The application creates a `remote` directory inside the watch directory. Files in this directory are never processed or uploaded, making it a safe place to store files that should not be uploaded.
 
-### Retention Management
+### Advanced Retention Management
 
-The application can automatically delete old snapshots from the S3 bucket based on a configurable retention period:
+The application offers sophisticated retention controls to manage storage costs:
 
-- Enable retention management with the `enable_retention` configuration option
-- Set the retention period in hours with the `retention_period_hours` option (default: 168 hours, which is 7 days)
-- The application will delete snapshots older than the retention period
-- The latest full snapshot is always preserved, regardless of age
-- When a full snapshot is deleted, all its incremental snapshots are also deleted
-- Cleanup runs on startup and then every 6 hours
+- **Dual Retention Policies**: Both count-based and time-based retention can be applied simultaneously
+- **Granular Controls**: Separate settings for full and incremental snapshots
+- **Count-based Retention**:
+  - `full_snapshot_retain_count`: Keep N most recent full snapshots (default: 3)
+  - `incremental_retain_count`: Keep N most recent incremental snapshots per full snapshot (default: 5)
+- **Time-based Retention**:
+  - `full_snapshot_retain_hours`: Keep full snapshots newer than X hours (default: 672 hours / 28 days)
+  - `incremental_retain_hours`: Keep incremental snapshots newer than X hours (default: 168 hours / 7 days)
+- **Implementation Details**:
+  - The latest full snapshot is always preserved, regardless of age
+  - When a full snapshot is deleted, all its incremental snapshots are also deleted
+  - Snapshots are kept if they satisfy either the count OR time-based retention
+  - Cleanup runs on startup and then every 6 hours
 
-This helps manage storage costs and prevents the S3 bucket from growing indefinitely.
+This advanced retention system allows fine-tuned control over storage usage while ensuring critical snapshots remain available.
+
+### Optimized latest.json File
+
+The application generates an optimized latest.json file with:
+
+- Organized field ordering for better readability
+- Removal of duplicate fields (no more redundant incremental snapshot information)
+- Proper handling of both full and incremental snapshot information
+- Inclusion of genesis hash for validator setup verification
+- Backward compatibility with older clients
+
+### Performance Tuning
+
+The application will support configurable upload performance tuning in a future version. Currently, the following settings are fixed:
+
+- **Parallel Upload Operations**: 
+  - Fixed at 5 concurrent uploads
+  - Will be configurable in a future version
+  
+- **Chunk Size**:
+  - Fixed at 32MB
+  - Will be configurable in a future version
+
+When these settings become configurable, they will allow you to fine-tune the performance based on your specific network conditions, server resources, and the S3-compatible storage provider's capabilities.
+
+### Multi-Instance Retention Management
+
+When running multiple instances of the snapshot uploader that share the same S3 bucket, special consideration should be given to retention management:
+
+- **Single Retention Manager**: Configure retention (`enable_retention: true`) on only one instance to prevent concurrent cleanup operations that could conflict with each other.
+
+- **Recommended Setup**:
+  - **Primary Instance**: Enable retention with your desired settings (`enable_retention: true`)
+  - **Secondary Instances**: Disable retention (`enable_retention: false`)
+
+- **Alternative Approach**: If you need high availability for retention management, you can enable retention on multiple instances but should:
+  - Use identical retention settings across all instances
+  - Set longer minimum intervals between cleanups (the default 5-minute cooldown helps prevent overlapping operations)
+  - Be aware that multiple instances may occasionally attempt cleanup operations in close succession
+
+- **Centralized Configuration**: For larger deployments, consider implementing a central configuration service that:
+  - Stores retention settings in a shared database or configuration file
+  - Designates a single "leader" instance responsible for retention
+  - Implements leader election if the designated retention manager goes offline
+
+The default implementation includes safeguards (cleanup is only performed if it hasn't run in the last 5 minutes) to minimize the risk of concurrent deletion operations, but for optimal operation, retention management should be assigned to a single instance when possible.
 
 ### Resumable Uploads
 

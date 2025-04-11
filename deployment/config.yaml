@@ -24,7 +24,15 @@ enable_incremental_snap: true
 
 # Retention settings
 enable_retention: true  # Enable automatic deletion of old snapshots
-retention_period_hours: 168  # Delete snapshots older than 7 days
+# retention_period_hours: 168  # Legacy: Delete snapshots older than 7 days
+
+# Full snapshot retention (count and time-based)
+full_snapshot_retain_count: 3  # Keep at least this many recent full snapshots
+full_snapshot_retain_hours: 168  # Keep full snapshots for 28 days (4 weeks)
+
+# Incremental snapshot retention (count and time-based)
+incremental_retain_count: 5  # Keep at least this many recent incremental snapshots per full snapshot
+incremental_retain_hours: 24  # Keep incremental snapshots for 7 days (1 week)
 
 # Log level (debug, info, warn, error)
 log_level: "info"
