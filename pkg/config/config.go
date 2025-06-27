@@ -15,6 +15,7 @@ type Config struct {
 	S3Endpoint              string        `yaml:"s3_endpoint" json:"s3_endpoint"`
 	S3PublicEndpoint        string        `yaml:"s3_public_endpoint" json:"s3_public_endpoint"`
 	S3Bucket                string        `yaml:"s3_bucket" json:"s3_bucket"`
+	S3Namespace             string        `yaml:"s3_namespace" json:"s3_namespace"`
 	S3AccessKey             string        `yaml:"s3_access_key" json:"s3_access_key"`
 	S3SecretKey             string        `yaml:"s3_secret_key" json:"s3_secret_key"`
 	S3UploadConcurrency     int           `yaml:"s3_upload_concurrency" json:"s3_upload_concurrency"`
@@ -96,6 +97,9 @@ func LoadFromEnv() *Config {
 	}
 	if val := os.Getenv("S3_BUCKET"); val != "" {
 		cfg.S3Bucket = val
+	}
+	if val := os.Getenv("S3_NAMESPACE"); val != "" {
+		cfg.S3Namespace = val
 	}
 	if val := os.Getenv("S3_ACCESS_KEY"); val != "" {
 		cfg.S3AccessKey = val
