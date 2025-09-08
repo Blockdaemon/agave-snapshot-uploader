@@ -77,7 +77,7 @@ func main() {
 	}
 
 	// Create S3 client
-	s3Client, err := s3.NewClient(cfg.S3Endpoint, cfg.S3Bucket, cfg.S3AccessKey, cfg.S3SecretKey)
+	s3Client, err := s3.NewClient(cfg.S3Endpoint, cfg.S3Bucket, cfg.S3Namespace, cfg.S3AccessKey, cfg.S3SecretKey)
 	if err != nil {
 		logger.Error("Failed to create S3 client", "error", err)
 		os.Exit(1)
