@@ -4,7 +4,7 @@ go 1.23.4
 
 require (
 	github.com/aws/aws-sdk-go-v2 v1.39.5
-	github.com/aws/aws-sdk-go-v2/credentials v1.18.19
+	github.com/aws/aws-sdk-go-v2/credentials v1.18.20
 	github.com/aws/aws-sdk-go-v2/service/s3 v1.89.1
 	github.com/aws/smithy-go v1.23.1
 	github.com/fsnotify/fsnotify v1.9.0
