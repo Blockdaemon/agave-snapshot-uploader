@@ -20,8 +20,8 @@ github.com/aws/aws-sdk-go-v2/service/internal/s3shared v1.19.12 h1:R3uW0iKl8rgNE
 github.com/aws/aws-sdk-go-v2/service/internal/s3shared v1.19.12/go.mod h1:XEttbEr5yqsw8ebi7vlDoGJJjMXRez4/s9pibpJyL5s=
 github.com/aws/aws-sdk-go-v2/service/s3 v1.89.1 h1:Dq82AV+Qxpno/fG162eAhnD8d48t9S+GZCfz7yv1VeA=
 github.com/aws/aws-sdk-go-v2/service/s3 v1.89.1/go.mod h1:MbKLznDKpf7PnSonNRUVYZzfP0CeLkRIUexeblgKcU4=
-github.com/aws/smithy-go v1.23.1 h1:sLvcH6dfAFwGkHLZ7dGiYF7aK6mg4CgKA/iDKjLDt9M=
-github.com/aws/smithy-go v1.23.1/go.mod h1:LEj2LM3rBRQJxPZTB4KuzZkaZYnZPnvgIhb4pu07mx0=
+github.com/aws/smithy-go v1.23.2 h1:Crv0eatJUQhaManss33hS5r40CG3ZFH+21XSkqMrIUM=
+github.com/aws/smithy-go v1.23.2/go.mod h1:LEj2LM3rBRQJxPZTB4KuzZkaZYnZPnvgIhb4pu07mx0=
 github.com/fsnotify/fsnotify v1.9.0 h1:2Ml+OJNzbYCTzsxtv8vKSFD9PbJjmhYF14k/jKC7S9k=
 github.com/fsnotify/fsnotify v1.9.0/go.mod h1:8jBTzvmWwFyi3Pb8djgCCO5IBqzKJ/Jwo8TRcHyHii0=
 golang.org/x/sys v0.13.0 h1:Af8nKPmuFypiUBjVoU9V20FiaFXOcuZI21p0ycVYYGE=
