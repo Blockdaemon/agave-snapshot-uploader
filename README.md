@@ -85,6 +85,7 @@ watch_dir: "/snapshots"
 # S3-compatible storage configuration
 s3_endpoint: "https://s3.example.com"
 s3_bucket: "solana-snapshots"
+s3_namespace: "mainnet"  # Optional: namespace prefix for all S3 remote paths
 s3_access_key: "your-access-key"
 s3_secret_key: "your-secret-key"
 s3_public_endpoint: "https://snapshots.example.com"  # Optional public endpoint for URLs in metadata
@@ -134,6 +135,7 @@ Alternatively, you can use environment variables:
 - `S3_ENDPOINT`: S3-compatible storage URL
 - `S3_PUBLIC_ENDPOINT`: Public endpoint URL for snapshot access
 - `S3_BUCKET`: S3 bucket name
+- `S3_NAMESPACE`: Optional namespace prefix for all S3 remote paths
 - `S3_ACCESS_KEY`: S3 access key
 - `S3_SECRET_KEY`: S3 secret key
 - `S3_UPLOAD_CONCURRENCY`: Number of parallel upload operations (will be supported in a future version)
@@ -179,6 +181,7 @@ Or with environment variables:
 export WATCH_DIR=/snapshots
 export S3_ENDPOINT=https://s3.example.com
 export S3_BUCKET=solana-snapshots
+export S3_NAMESPACE=mainnet
 export S3_ACCESS_KEY=your-access-key
 export S3_SECRET_KEY=your-secret-key
 ./snapshot-monitor
@@ -228,6 +231,7 @@ docker run -d \
   -e WATCH_DIR=/snapshots \
   -e S3_ENDPOINT=https://s3.example.com \
   -e S3_BUCKET=solana-snapshots \
+  -e S3_NAMESPACE=mainnet \
   -e S3_ACCESS_KEY=your-access-key \
   -e S3_SECRET_KEY=your-secret-key \
   ghcr.io/maestroi/agave-snapshot-uploader:latest

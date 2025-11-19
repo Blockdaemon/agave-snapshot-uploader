@@ -39,9 +39,10 @@ const (
 
 // Client is a wrapper around AWS S3 client
 type Client struct {
-	client     *s3.Client
-	bucketName string
-	logger     *slog.Logger
+	client          *s3.Client
+	bucketName      string
+	bucketNamespace string
+	logger          *slog.Logger
 }
 
 // ProgressReader is a wrapper around an io.Reader that reports progress
@@ -145,7 +146,7 @@ func (l *filteringLogger) Logf(classification logging.Classification, format str
 }
 
 // NewClient creates a new S3 client
-func NewClient(endpoint, bucketName, accessKey, secretKey string) (*Client, error) {
+func NewClient(endpoint, bucketName, bucketNamespace, accessKey, secretKey string) (*Client, error) {
 	// Create exactly the same config as the faster implementation
 	cfg := aws.Config{
 		Credentials: credentials.NewStaticCredentialsProvider(accessKey, secretKey, ""),
@@ -162,9 +163,10 @@ func NewClient(endpoint, bucketName, accessKey, secretKey string) (*Client, erro
 	client := s3.NewFromConfig(cfg)
 
 	return &Client{
-		client:     client,
-		bucketName: bucketName,
-		logger:     slog.New(slog.NewTextHandler(os.Stdout, nil)),
+		client:          client,
+		bucketName:      bucketName,
+		bucketNamespace: bucketNamespace,
+		logger:          slog.New(slog.NewTextHandler(os.Stdout, nil)),
 	}, nil
 }
 
@@ -175,13 +177,20 @@ func (c *Client) SetLogger(logger *slog.Logger) {
 	}
 }
 
+// getRemotePath returns the path with namespace prefix if namespace is set
+func (c *Client) getRemotePath(path string) string {
+	if c.bucketNamespace == "" {
+		return path
+	}
+	return c.bucketNamespace + "/" + path
+}
+
 // PartReader is a reader that handles part uploads with proper checksum handling
 type PartReader struct {
 	reader     io.Reader
 	size       int64
 	read       int64
 	progressFn func(n int64)
-	buf        []byte
 }
 
 func NewPartReader(reader io.Reader, size int64, progressFn func(n int64)) *PartReader {
@@ -207,8 +216,10 @@ func (pr *PartReader) Size() int64 {
 	return pr.size
 }
 
-// CleanupMultipartUploads cleans up any existing multipart uploads for the given key
-func (c *Client) CleanupMultipartUploads(ctx context.Context, key string) error {
+// CleanupMultipartUploads cleans up any existing multipart uploads for the given path
+func (c *Client) CleanupMultipartUploads(ctx context.Context, path string) error {
+	// Apply namespace to S3 path
+	key := c.getRemotePath(path)
 	c.logger.Info("Starting cleanup of existing multipart uploads", "key", key)
 
 	// List all multipart uploads
@@ -260,7 +271,7 @@ func (c *Client) CleanupMultipartUploads(ctx context.Context, key string) error 
 }
 
 // UploadFile uploads a file to S3 using the fast implementation approach
-func (c *Client) UploadFile(ctx context.Context, localPath, s3Path string) error {
+func (c *Client) UploadFile(ctx context.Context, localPath, path string) error {
 	// Open file exactly as in the faster implementation
 	file, err := os.Open(localPath)
 	if err != nil {
@@ -274,6 +285,9 @@ func (c *Client) UploadFile(ctx context.Context, localPath, s3Path string) error
 		return fmt.Errorf("failed to get file info: %w", err)
 	}
 	fileSize := info.Size()
+
+	// Apply namespace to S3 path
+	s3Path := c.getRemotePath(path)
 
 	c.logger.Info("Starting upload", "file", localPath, "key", s3Path, "size", fileSize)
 
@@ -388,8 +402,10 @@ func (c *Client) UploadFileMultipart(ctx context.Context, localPath, s3Path stri
 	return c.UploadFile(ctx, localPath, s3Path)
 }
 
-// cleanupExistingUploads aborts any existing multipart uploads for the given key
-func (c *Client) cleanupExistingUploads(ctx context.Context, key string) error {
+// cleanupExistingUploads aborts any existing multipart uploads for the given path
+func (c *Client) cleanupExistingUploads(ctx context.Context, path string) error {
+	// Apply namespace to S3 path
+	key := c.getRemotePath(path)
 	listResp, err := c.client.ListMultipartUploads(ctx, &s3.ListMultipartUploadsInput{
 		Bucket: aws.String(c.bucketName),
 		Prefix: aws.String(key),
@@ -478,11 +494,13 @@ func formatFileSize(size int64) string {
 }
 
 // FileExists checks if a file exists in S3
-func (c *Client) FileExists(s3Path string) (bool, error) {
+func (c *Client) FileExists(path string) (bool, error) {
 	// Create a context with timeout for the operation
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
+	// Apply namespace to S3 path
+	s3Path := c.getRemotePath(path)
 	startTime := time.Now()
 	_, err := c.client.HeadObject(ctx, &s3.HeadObjectInput{
 		Bucket: aws.String(c.bucketName),
@@ -513,7 +531,7 @@ func (c *Client) FileExists(s3Path string) (bool, error) {
 }
 
 // DownloadFile downloads a file from S3
-func (c *Client) DownloadFile(s3Path, localPath string) error {
+func (c *Client) DownloadFile(path, localPath string) error {
 	// Create the directory if it doesn't exist
 	dir := filepath.Dir(localPath)
 	if err := os.MkdirAll(dir, 0755); err != nil {
@@ -527,6 +545,8 @@ func (c *Client) DownloadFile(s3Path, localPath string) error {
 	}
 	defer file.Close()
 
+	// Apply namespace to S3 path
+	s3Path := c.getRemotePath(path)
 	c.logger.Info("Downloading file", "s3_path", s3Path, "local_path", localPath)
 
 	// Download the file
@@ -550,7 +570,9 @@ func (c *Client) DownloadFile(s3Path, localPath string) error {
 }
 
 // DeleteObject deletes an object from S3, ensuring metadata files for snapshots are preserved
-func (c *Client) DeleteObject(s3Path string) error {
+func (c *Client) DeleteObject(path string) error {
+	// Apply namespace to S3 path
+	s3Path := c.getRemotePath(path)
 	// If we're deleting a metadata file, first check if the snapshot exists
 	if IsMetadataKey(s3Path) {
 		hasSnapshot, err := c.HasCorrespondingFile(context.Background(), s3Path)
@@ -603,7 +625,8 @@ func (c *Client) DeleteObjects(s3Paths []string) error {
 				continue
 			}
 		}
-		filteredPaths = append(filteredPaths, path)
+		// Apply namespace to S3 path
+		filteredPaths = append(filteredPaths, c.getRemotePath(path))
 	}
 	c.logger.Info("Filtered paths for deletion",
 		"original_count", len(s3Paths),
@@ -693,7 +716,7 @@ func (c *Client) ListObjects(prefix string) ([]S3Object, error) {
 	for {
 		result, err := c.client.ListObjectsV2(context.Background(), &s3.ListObjectsV2Input{
 			Bucket:            aws.String(c.bucketName),
-			Prefix:            aws.String(prefix),
+			Prefix:            aws.String(c.getRemotePath(prefix)),
 			ContinuationToken: continuationToken,
 		})
 		if err != nil {
@@ -786,7 +809,7 @@ func GetUploadInfoFilePath(filePath string) string {
 func (c *Client) AbortMultipartUpload(s3Path, uploadID string) error {
 	_, err := c.client.AbortMultipartUpload(context.Background(), &s3.AbortMultipartUploadInput{
 		Bucket:   aws.String(c.bucketName),
-		Key:      aws.String(s3Path),
+		Key:      aws.String(c.getRemotePath(s3Path)),
 		UploadId: aws.String(uploadID),
 	})
 	if err != nil {
@@ -863,10 +886,10 @@ func (c *Client) HasCorrespondingFile(ctx context.Context, key string) (bool, er
 	var checkKey string
 	if IsMetadataKey(key) {
 		// For metadata file, check if snapshot exists
-		checkKey = GetSnapshotKeyFromMetadata(key)
+		checkKey = c.getRemotePath(GetSnapshotKeyFromMetadata(key))
 	} else if IsSnapshotKey(key) {
 		// For snapshot file, check if metadata exists
-		checkKey = GetMetadataKey(key)
+		checkKey = c.getRemotePath(GetMetadataKey(key))
 	} else {
 		// Not a snapshot or metadata file
 		return false, nil
@@ -914,7 +937,7 @@ func (c *Client) UpdateLatestMetadata(ctx context.Context, metadataKey string) e
 		return fmt.Errorf("not a metadata file: %s", metadataKey)
 	}
 
-	c.logger.Info("Updating latest.json with metadata", "source", metadataKey)
+	c.logger.Info("Updating latest.json with metadata", "source", c.getRemotePath(metadataKey))
 
 	// Create a temporary file to download the metadata
 	tmpFile, err := os.CreateTemp("", "metadata-*.json")
@@ -1157,7 +1180,7 @@ func (c *Client) UpdateLatestMetadata(ctx context.Context, metadataKey string) e
 	// Upload consolidated metadata as latest.json with proper content type
 	_, err = c.client.PutObject(ctx, &s3.PutObjectInput{
 		Bucket:      aws.String(c.bucketName),
-		Key:         aws.String("latest.json"),
+		Key:         aws.String(c.getRemotePath("latest.json")),
 		Body:        consolidatedFile,
 		ContentType: aws.String("application/json"),
 	})
