@@ -145,12 +145,17 @@ func (l *filteringLogger) Logf(classification logging.Classification, format str
 }
 
 // NewClient creates a new S3 client
-func NewClient(endpoint, bucketName, accessKey, secretKey string) (*Client, error) {
-	// Create exactly the same config as the faster implementation
+// region parameter: use "auto" for S3-compatible services (GCP, R2, MinIO), or actual region for AWS S3 (e.g. "eu-central-1")
+func NewClient(endpoint, bucketName, accessKey, secretKey, region string) (*Client, error) {
+	// Use provided region or default to "auto" for backward compatibility
+	if region == "" {
+		region = "auto"
+	}
+
 	cfg := aws.Config{
 		Credentials: credentials.NewStaticCredentialsProvider(accessKey, secretKey, ""),
-		Region:      "auto", // Default region as in the faster implementation
-		EndpointResolverWithOptions: aws.EndpointResolverWithOptionsFunc(func(service, region string, _ ...interface{}) (aws.Endpoint, error) {
+		Region:      region,
+		EndpointResolverWithOptions: aws.EndpointResolverWithOptionsFunc(func(service, r string, _ ...interface{}) (aws.Endpoint, error) {
 			return aws.Endpoint{
 				URL:               endpoint,
 				HostnameImmutable: true,
@@ -158,7 +163,7 @@ func NewClient(endpoint, bucketName, accessKey, secretKey string) (*Client, erro
 		}),
 	}
 
-	// Create client directly from config as in the faster implementation
+	// Create client directly from config
 	client := s3.NewFromConfig(cfg)
 
 	return &Client{
