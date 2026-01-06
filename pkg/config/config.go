@@ -14,6 +14,7 @@ type Config struct {
 	WatchDir                string        `yaml:"watch_dir" json:"watch_dir"`
 	S3Endpoint              string        `yaml:"s3_endpoint" json:"s3_endpoint"`
 	S3PublicEndpoint        string        `yaml:"s3_public_endpoint" json:"s3_public_endpoint"`
+	S3Region                string        `yaml:"s3_region" json:"s3_region"`
 	S3Bucket                string        `yaml:"s3_bucket" json:"s3_bucket"`
 	S3AccessKey             string        `yaml:"s3_access_key" json:"s3_access_key"`
 	S3SecretKey             string        `yaml:"s3_secret_key" json:"s3_secret_key"`
@@ -47,6 +48,7 @@ func DefaultConfig() *Config {
 		WatchDir:                "/snapshots",
 		SolanaRpcUrl:            "http://localhost:8899",
 		S3PublicEndpoint:        "", // Default is empty, will fall back to S3Endpoint
+		S3Region:                "auto", // Default for S3-compatible services; set to actual region for AWS S3
 		S3UploadConcurrency:     5,  // These are not used currently, but kept for future
 		S3ChunkSizeMB:           32, // These are not used currently, but kept for future
 		FullSnapshotGap:         25000,
@@ -102,6 +104,9 @@ func LoadFromEnv() *Config {
 	}
 	if val := os.Getenv("S3_SECRET_KEY"); val != "" {
 		cfg.S3SecretKey = val
+	}
+	if val := os.Getenv("S3_REGION"); val != "" {
+		cfg.S3Region = val
 	}
 	if val := os.Getenv("S3_UPLOAD_CONCURRENCY"); val != "" {
 		if intVal, err := strconv.Atoi(val); err == nil {
